@@ -1,10 +1,3 @@
----
-title: "Script Pengeluaran Kesehatan Katastropik"
-author: "Athira Fatin Naura"
-date: "2024-10-07"
-output: html_document
----
-
 # Input Data
 ```{r}
 library(readr)
@@ -136,7 +129,6 @@ predicted_labels <- ifelse(predicted_probs > threshold, "Mengalami", "Tidak Meng
 predicted_labels <- factor(predicted_labels, levels = c("Tidak Mengalami", "Mengalami"))
 
 library(caret)
-
 # Membuat confusion matrix
 conf_matrix <- confusionMatrix(predicted_labels, katastropik_data$KATASTROPIK_10)
 
@@ -149,15 +141,14 @@ FN <- conf_matrix$table[1, 2]  # Tidak Mengalami yang diprediksi Mengalami
 FP <- conf_matrix$table[2, 1]  # Mengalami yang diprediksi Tidak Mengalami
 TN <- conf_matrix$table[1, 1]  # Tidak Mengalami yang diprediksi Tidak Mengalami
 
-##akurasi
+# Akurasi
 accuracy <- (TN+TP)/(TN+FN+TP+FP)
 
-##spesifisitas
+# Spesifisitas
 specificity <- TN/(TN+FP)
 
 # Sensitivitas
 sensitivity <- TP / (TP + FN)
-
 
 # Menampilkan hasil
 list(Akurasi= accuracy, Spesifisitas = specificity, Sensitivitas = sensitivity)
