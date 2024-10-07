@@ -1,0 +1,165 @@
+---
+title: "Script Pengeluaran Kesehatan Katastropik"
+author: "Athira Fatin Naura"
+date: "2024-10-07"
+output: html_document
+---
+
+# Input Data
+```{r}
+library(readr)
+katastropik_data <- read.csv(file.choose())
+```
+
+```{r}
+library(dplyr)
+katastropik_data <- select(katastropik_data, 
+               "KODE_PROV"=R101,
+               "KODE_KAB"=R102,
+               "KLASIFIKASI_DAERAH"=R105,
+               "LANSIA" = lansia2.y,
+               "BALITA" = balita2.y,
+               "RAWAT_JALAN"= rawatjalan2.x,
+               "RAWAT_INAP"= rawatinap2.x,
+               "JKN" = jkn4.y,
+               "PENDIDIKAN_TTG"= pendidikan3.x,
+               "BANYAK_ART"=R301,
+               "R301"=R301,
+               "KATASTROPIK_10" = katastropik_10,
+               "FWT"=FWT,
+               "R1102"=R1102,
+               "R1103"=R1103,
+               "ART_KERJA"= art_kerja2.x,
+               "LAP_USAHA" = R706,
+               "R706" = R706,
+               "R707"=R707,
+               "BANSOS"= bansos,
+               )%>%
+  mutate(
+    "KODE_PROV"=KODE_PROV,
+    "KODE_KAB"=KODE_KAB,
+    "KLASIFIKASI_DAERAH"= ifelse((KLASIFIKASI_DAERAH ==1),0,1),
+    "LANSIA" = ifelse((LANSIA>=1),1,0),
+    "BALITA" = ifelse((BALITA>=1),1,0),
+    "RAWAT_JALAN"= ifelse((RAWAT_JALAN>=1),1,0),
+    "RAWAT_INAP"= ifelse((RAWAT_INAP>=1),1,0),
+    "JKN" = ifelse(JKN == 0, 0,
+                        ifelse( JKN == 1,
+                                 1,
+                                 2)),
+    "PENDIDIKAN_TTG"=ifelse((PENDIDIKAN_TTG ==1),0,1),
+    "BANYAK_ART4"=ifelse(BANYAK_ART<=4 & BANYAK_ART >=1,0,1),
+    "KATASTROPIK_10" = ifelse((KATASTROPIK_10==1),1,0),
+    "FWT"=FWT, 
+    "ART_KERJA" = ifelse((ART_KERJA>=1),1,0),
+    "LAP_USAHA3" = ifelse((LAP_USAHA <= 6 & LAP_USAHA >= 1),1,0),
+    "BANSOS" = ifelse((BANSOS==1),1,0)
+ ) %>%
+  mutate(
+    "KODE_PROV"=KODE_PROV,
+    "KODE_KAB"=KODE_KAB,
+    "KLASIFIKASI_DAERAH"=factor(KLASIFIKASI_DAERAH,levels=c(0,1), labels=c("Perkotaan", "Perdesaan")),
+    "LANSIA" = factor(LANSIA,levels=c(0,1), labels=c("Tidak Ada", "Ada")),
+    "BALITA" = factor(BALITA,levels=c(0,1), labels=c("Tidak Ada", "Ada")),
+    "RAWAT_JALAN"= factor(RAWAT_JALAN,levels=c(0,1), labels=c("Tidak Ada", "Ada")),
+    "RAWAT_INAP"= factor(RAWAT_INAP,levels=c(0,1), labels=c("Tidak Ada", "Ada")),
+    "JKN" = factor(JKN,levels=c(0,1,2), labels=c("Semua Tidak Memiliki", "Sebagian Memiliki","Semua Memiliki")),
+    "PENDIDIKAN_TTG"= factor(PENDIDIKAN_TTG,levels=c(0,1), labels=c(">=SMA", "<SMA")),
+    "BANYAK_ART4"= factor(BANYAK_ART4,levels=c(0,1), labels=c("1-4", ">4")),
+    "KATASTROPIK_10" = factor(KATASTROPIK_10,levels=c(0,1),labels=c("Tidak Mengalami", "Mengalami")),   
+    "FWT"=FWT,
+    "LAP_USAHA3"= factor(LAP_USAHA3, levels=c(0,1),labels=c("Non Pertanian","Pertanian")),
+    "BANSOS"=factor(BANSOS,levels=c(0,1), labels=c("Tidak Menerima", "Menerima")),
+  )
+```
+
+# RELEVEL
+```{r}
+katastropik_data$KLASIFIKASI_DAERAH <- relevel(katastropik_data$KLASIFIKASI_DAERAH, ref = "Perkotaan")
+katastropik_data$LANSIA <- relevel(katastropik_data$LANSIA, ref = "Tidak Ada")
+katastropik_data$BALITA <- relevel(katastropik_data$BALITA, ref = "Tidak Ada")
+katastropik_data$RAWAT_JALAN <- relevel(katastropik_data$RAWAT_JALAN, ref = "Tidak Ada")
+katastropik_data$RAWAT_INAP <- relevel(katastropik_data$RAWAT_INAP, ref = "Tidak Ada")
+katastropik_data$JKN <- relevel(katastropik_data$JKN, ref = "Semua Tidak Memiliki")
+katastropik_data$PENDIDIKAN_TTG <- relevel(katastropik_data$PENDIDIKAN_TTG, ref = ">=SMA")
+katastropik_data$BANYAK_ART4 <- relevel(katastropik_data$BANYAK_ART4, ref = "1-4")
+katastropik_data$KATASTROPIK_10 <- relevel(katastropik_data$KATASTROPIK_10, ref = "Tidak Mengalami")
+katastropik_data$LAP_USAHA3 <- relevel(katastropik_data$LAP_USAHA3, ref = "Pertanian")
+katastropik_data$BANSOS <- relevel(katastropik_data$BANSOS, ref = "Tidak Menerima")
+```
+
+# Pemodelan REGLOG BINER FIRTH
+```{r}
+library(brglm2)
+library(generalhoslem)
+library(ResourceSelection)
+
+# Model GLM
+model0p = glm(KATASTROPIK_10 ~ 1, data = katastropik_data,family = binomial(logit), method = "brglmFit", pl=TRUE)
+
+mdl_firth6_10 <- glm(KATASTROPIK_10~PENDIDIKAN_TTG+LANSIA+BALITA+BANYAK_ART4+LAP_USAHA3+JKN+BANSOS+KLASIFIKASI_DAERAH+RAWAT_JALAN+RAWAT_INAP,family = binomial(link ="logit"),data = katastropik_data, method = "brglmFit",pl=TRUE)
+summary(mdl_firth6_10)
+
+#simultan
+library(lmtest)
+lrtest(model0p,mdl_firth6_10)
+
+#goodnes of fit
+library(generalhoslem)
+library(ResourceSelection)
+hoslem.test(mdl_firth6_10$y, fitted(mdl_firth6_10))
+
+#odds ratio
+exp(coef(mdl_firth6_10))
+```
+
+# Evaluasi Model
+```{r}
+# Kurva ROC Ambang batas 10 persen
+library(pROC)
+data.prediksi2 <- predict(object = mdl_firth6_10, newdata= katastropik_data, type= "response" )
+ROC2 <- roc(katastropik_data$KATASTROPIK_10, data.prediksi2)
+plot.roc(ROC2, print.auc = T)
+thres.coor <- coords(ROC2, "best", best.method="closest.topleft", ret=c("threshold", "accuracy"))
+print(thres.coor)
+
+# Membuat prediksi probabilitas
+predicted_probs <- predict(mdl_firth6_10, type = "response")
+
+# Menentukan ambang batas
+threshold <- 0.02134043  # Anda dapat mengubah ini sesuai kebutuhan
+
+# Mengklasifikasikan prediksi
+predicted_labels <- ifelse(predicted_probs > threshold, "Mengalami", "Tidak Mengalami")
+
+# Pastikan bahwa predicted_labels adalah faktor dengan level yang sama
+predicted_labels <- factor(predicted_labels, levels = c("Tidak Mengalami", "Mengalami"))
+
+library(caret)
+
+# Membuat confusion matrix
+conf_matrix <- confusionMatrix(predicted_labels, katastropik_data$KATASTROPIK_10)
+
+# Menampilkan hasil
+print(conf_matrix)
+
+# Menghitung TP, FN, FP, TN berdasarkan penjelasan
+TP <- conf_matrix$table[2, 2]  # Mengalami yang diprediksi Mengalami
+FN <- conf_matrix$table[1, 2]  # Tidak Mengalami yang diprediksi Mengalami
+FP <- conf_matrix$table[2, 1]  # Mengalami yang diprediksi Tidak Mengalami
+TN <- conf_matrix$table[1, 1]  # Tidak Mengalami yang diprediksi Tidak Mengalami
+
+##akurasi
+accuracy <- (TN+TP)/(TN+FN+TP+FP)
+
+##spesifisitas
+specificity <- TN/(TN+FP)
+
+# Sensitivitas
+sensitivity <- TP / (TP + FN)
+
+
+# Menampilkan hasil
+list(Akurasi= accuracy, Spesifisitas = specificity, Sensitivitas = sensitivity)
+```
+
